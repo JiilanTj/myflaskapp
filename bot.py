@@ -10,13 +10,13 @@ import re
 # API Configuration
 API_ID = '20115110'
 API_HASH = '192c9900730edbd7e03fe772e3f8810d'
-BOT_TOKEN = '7811834226:AAEz5s-cNCFFVWqE2EoaHRZpLzfVKCss4es'
+BOT_TOKEN = '7816226672:AAGjfEzFvg6Hi4wWJpCHuLby6hFuRbaHyVk'
 SESSION_PASSWORD = "Soleplayer0p3$"
-ALLOWED_USER_ID = 7581225841
+ALLOWED_USER_ID = 5795516006
 
 # Constants
 SESSION_FOLDER = "Session/"
-FILES_PER_PAGE = 2
+FILES_PER_PAGE = 5
 verified_users = {}
 user_states = {}
 
@@ -115,12 +115,48 @@ _Untuk bantuan lebih lanjut, silakan hubungi admin._
     await event.edit(help_message, buttons=buttons, parse_mode='markdown')
 
 def get_files_with_pagination(page):
-    """Get session files with pagination"""
-    files = [f for f in os.listdir(SESSION_FOLDER) if f.endswith('.session')]
-    total_pages = max(1, math.ceil(len(files) / FILES_PER_PAGE))
+    """Get session files with pagination, sorted by creation time"""
+    import os
+    import time
+    from datetime import datetime, timedelta
+
+    def get_file_time(file_path):
+        """Get file creation/modification time"""
+        return os.path.getmtime(file_path)
+
+    def format_phone_with_status(file_name, file_time):
+        """Format phone number with status if recently created"""
+        phone_number = file_name.replace('.session', '')
+        # Return tuple of (phone_number, is_new)
+        file_datetime = datetime.fromtimestamp(file_time)
+        three_hours_ago = datetime.now() - timedelta(hours=3)
+        is_new = file_datetime > three_hours_ago
+        return (phone_number, is_new)
+
+    # Get all session files with their creation times
+    session_files = []
+    for f in os.listdir(SESSION_FOLDER):
+        if f.endswith('.session'):
+            file_path = os.path.join(SESSION_FOLDER, f)
+            file_time = get_file_time(file_path)
+            session_files.append((f, file_time))
+
+    # Sort files by creation time (newest first)
+    session_files.sort(key=lambda x: x[1], reverse=True)
+    
+    # Apply pagination
+    total_pages = max(1, math.ceil(len(session_files) / FILES_PER_PAGE))
     start = page * FILES_PER_PAGE
     end = start + FILES_PER_PAGE
-    return files[start:end], total_pages
+    
+    # Format file information for display
+    paginated_files = []
+    for file_name, file_time in session_files[start:end]:
+        phone_number, is_new = format_phone_with_status(file_name, file_time)
+        paginated_files.append((phone_number, is_new))
+
+    return paginated_files, total_pages
+
 
 async def show_sessions_page(event, page=0):
     """Display session files with navigation buttons"""
@@ -137,10 +173,10 @@ Silakan hubungi admin untuk informasi lebih lanjut.
         return
     
     message = "*📱 Daftar Session Tersedia:*\n\n"
-    for i, file in enumerate(files, 1):
-        phone_number = file.replace('.session', '')
-        formatted_number = f"+{phone_number}"
-        message += f"📱 `{formatted_number}`\n"
+    for i, (phone_number, is_new) in enumerate(files, 1):
+        # Format: number. +phone_number (baru)
+        # The phone_number is wrapped in code blocks for copying, while the index and 'baru' label are outside
+        message += f"{i}. `+{phone_number}`{' (baru)' if is_new else ''}\n"
     
     message += "\n_Gunakan tombol navigasi untuk melihat session lainnya._"
     
